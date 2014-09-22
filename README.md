@@ -11,5 +11,11 @@ Sistema Operativo: Desarrollado y probado en Linux. Corre en Mac OS con pequeños
 
 Compilador de C++, recomendado g++ de [GCC](https://gcc.gnu.org/).
 
-Librería [QT](https://qt-project.org/downloads) para C++.
+Librería [QT](https://qt-project.org/downloads) para C++, Recomienda el IDE Qt Creator para visualizar el código y correr el simulador.
 
+Herramienta para graficar funciones [Gnuplot](http://www.gnuplot.info/). 
+
+## Correr el Simulador
+
+- Abrir el archivo 'simulador.pro' con Qt Creator.
+- Correr el programa desde Qt Creator.
