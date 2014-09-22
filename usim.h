@@ -34,6 +34,7 @@ private:
     float DELAY1;
     float DELAY2;
     float TIMEOUT;      //seconds
+    float DELTA;
     //************
 
     QString log;                    //gui's log
@@ -140,9 +141,10 @@ public:
         DELAY1=0;
         DELAY2=0;
         TIMEOUT=0;
+        DELTA=0;
     }
 
-    USim (float tsim, int ar, int bw1, int bw2, int da, int sst, int bfs,float d1,float d2,float to):
+    USim (float tsim, int ar, int bw1, int bw2, int da, int sst, int bfs,float d1,float d2,float to, float del):
         TSIM(tsim),
         APP_RATE(ar),
         BOTTLENECK(bw1),
@@ -152,7 +154,8 @@ public:
         BUFFERSIZE(bfs),
         DELAY1(d1),
         DELAY2(d2),
-        TIMEOUT(to)
+        TIMEOUT(to),
+        DELTA(del)
     {
         msg_id=0;
         seqno=0;
@@ -176,14 +179,14 @@ public:
         fprintf(ssthresh,"0 %i\n",SSTHRESH);
 
         float gp_counter = 0;
-        float next_RTT = (DELAY1 + DELAY2)*2; //next_RTT = (delay_A * delay_B)*2  aprox value for next RTT in segs, used by throughput and goodput plot
+
         FILE *gp_trace;
         gp_trace=fopen("temp/gp_trace.dat","w");
         fprintf(gp_trace,"0 %f\n",gp_counter);
 
         float tp_counter = 0;
+
         FILE *tp_trace;
-        float next_RTT_sender= (DELAY1 + DELAY2)*2;
         tp_trace=fopen("temp/tp_trace.dat","w");
         fprintf(tp_trace,"0 %f\n",tp_counter);
 
@@ -297,8 +300,13 @@ public:
 
         start_app(APP_RATE, a, tr_b);
 
-        // statistics?
 
+        // statistics
+        Tcp_segment *dummy_segment = NULL;
+        Event * e = new Event(trace, dummy_segment, a, b);
+        e->set_timestamp(usim_sched.get_curr_time() + DELTA);
+
+        usim_sched.insert(e);
 
         current_event = usim_sched.dispatch();
 
@@ -326,7 +334,17 @@ public:
 
         while (usim_sched.get_curr_time() <= TSIM) {
 
+            if (current_event->get_type() == trace)
+            {
+                Event * e = new Event(trace, dummy_segment, a, b);
+                e->set_timestamp(usim_sched.get_curr_time() + DELTA );
+                usim_sched.insert(e);
 
+                fprintf(tp_trace,"%f %f\n",usim_sched.get_curr_time(),tp_counter*PACKETSIZE*8);
+                tp_counter=0;
+                fprintf(gp_trace,"%f %f\n",usim_sched.get_curr_time(),gp_counter*PACKETSIZE*8);
+                gp_counter=0;
+            }
 
             // packet arrival to the node from the application (at a certain rate)
             // this is the input rate, what may cause queuing delay
@@ -334,6 +352,8 @@ public:
             if (current_event->get_from_node()->get_node_type() == APP &&
                     current_event->get_type() == PKT_ARRIVAL_TO_TRANSPORT)
             {
+
+
                 // Receive the message at transport level
                 Message *msg = static_cast<Message*>(current_event->get_assoc_pdu());
 
@@ -355,6 +375,7 @@ public:
                 {
                     for(int i=1; i<=init_cwnd; i++)
                     {
+
                         if(current_event->get_to_node()->get_queue_size() > 0)
                         {
                             sending_pdu=current_event->get_to_node()->pdu_departure();
@@ -387,12 +408,6 @@ public:
                 log += "\n"+QString::number(usim_sched.get_curr_time()) +" ----- "+" From SRC MAC layer -> ACK_ARRIVAL_TO_TRANSPORT";
                 current_ack = static_cast<Ack *>(current_event->get_assoc_pdu())->get_ackno();
 
-                if(usim_sched.get_curr_time()  > next_RTT_sender){
-
-                    fprintf(tp_trace,"%f %f\n",usim_sched.get_curr_time(),tp_counter*PACKETSIZE*8);
-                    tp_counter=0;
-                    next_RTT_sender += (DELAY1 + DELAY2)*2;
-                }
 
                 //Adding event to Nam file
                 sprintf(namInstruction,"r -t %.6f -e %i -s 1 -d 0 -c 1 -i 1",usim_sched.get_curr_time(), ACKSIZE);
@@ -829,6 +844,7 @@ public:
                     }
                     if(current_event->get_to_node()->get_queue_size() + 1 > current_event->get_to_node()->get_queue_capacity())
                     {
+
                         log += "\n****************************";
                         log += "\n"+QString::number(usim_sched.get_curr_time()) +" ----- "+" Full Router node forward queue -> DROPPING pck id:" + QString::number(static_cast<Tcp_segment *>(current_event->get_assoc_pdu())->get_seqno());
                         log += "\n****************************";
@@ -876,12 +892,12 @@ public:
                 Tcp_segment * acknowledged_segment =  static_cast<Tcp_segment *>(current_event->get_assoc_pdu());
                 it = received_packets.begin();
 
-                if(usim_sched.get_curr_time()  > next_RTT){
+//                if(usim_sched.get_curr_time()  > next_RTT){
 
-                    fprintf(gp_trace,"%f %f\n",usim_sched.get_curr_time(),gp_counter*PACKETSIZE*8);
-                    gp_counter=0;
-                    next_RTT += (DELAY1 + DELAY2)*2;
-                }
+//                    fprintf(gp_trace,"%f %f\n",usim_sched.get_curr_time(),gp_counter*PACKETSIZE*8);
+//                    gp_counter=0;
+//                    next_RTT += (DELAY1 + DELAY2);
+//                }
 
                  if(expected_seqno == acknowledged_segment->get_seqno())
                 {
@@ -1006,6 +1022,7 @@ public:
         fprintf(ssthresh,"%f %i \n",(usim_sched.get_curr_time() - 0.01),SSTHRESH);
         fclose(ssthresh);
 
+
         return 0;
     }
 
@@ -1023,7 +1040,9 @@ public:
         fprintf(pipe, "set key top left\n");
         fprintf(pipe, "plot \"temp/cwnd_trace.dat\" using 1:2 with linespoints  title \" cwnd \", \"temp/ssthresh_trace.dat\" using 1:2 with linespoints linetype 12 title \" ssthreshold \" \n");
         //fprintf(pipe, "plot \"temp/cwnd_trace.dat\" using 1:2 with linespoints  title \" cwnd \"\n");
+        //fprintf(pipe, "plot \"temp/cwnd_trace1.dat\" using 1:2 with linespoints  title \" cwnd 0 divacks\", \"temp/cwnd_trace2.dat\" using 1:2 with linespoints  title \" cwnd 1 divacks\", \"temp/cwnd_trace3.dat\" using 1:2 with linespoints  title \" cwnd 4 divacks\",\"temp/cwnd_trace4.dat\" using 1:2 with linespoints  title \" cwnd 8 divacks\"  \n");
         fclose(pipe);
+
     }
     void plot_gp()
     {
@@ -1037,7 +1056,7 @@ public:
         fprintf(pipe, "set xlabel 'Tiempo(s)'\n");
         fprintf(pipe, "set ylabel 'Goodput(bps)'\n");
         fprintf(pipe, "set key top left\n");
-        fprintf(pipe, "plot \"temp/gp_trace.dat\" using 1:2 with linespoints linetype 2 title \" goodput \" \n");
+        fprintf(pipe, "plot \"temp/gp_trace.dat\" using 1:2 with linespoints linetype rgb \"#FF4000\" title \" Goodput \" \n");
         fclose(pipe);
     }
     void plot_tp()
@@ -1050,9 +1069,26 @@ public:
         fprintf(pipe, "set terminal jpeg medium\n");
         fprintf(pipe, "set output 'temp/uSim_tp.jpeg'\n");
         fprintf(pipe, "set xlabel 'Tiempo(s)'\n");
-        fprintf(pipe, "set ylabel 'Throughput(bps)'\n");
+        fprintf(pipe, "set ylabel 'Rendimiento(bps)'\n");
         fprintf(pipe, "set key top left\n");
-        fprintf(pipe, "plot \"temp/tp_trace.dat\" using 1:2 with linespoints linetype 3 title \" throughput \" \n");
+        fprintf(pipe, "plot \"temp/tp_trace.dat\" using 1:2 with linespoints linetype 3 title \" Throughput \" \n");
+//        fprintf(pipe, "plot \"temp/tp_trace.dat\" using 1:2 with linespoints linetype rgb \"#0404B4\" title \" Throughput \", \"temp/gp_trace.dat\" using 1:2 with linespoints linetype rgb \"#FF4000\" title \" Goodput \"\n");
+        fclose(pipe);
+    }
+    void plot_tp_and_gp()
+    {
+        FILE *pipe = popen("gnuplot -persist","w");
+
+        fprintf(pipe, "set grid\n");
+        fprintf(pipe, "set boxwidth 1 absolute\n");
+        fprintf(pipe, "set style fill solid 1.00 border -1\n");
+        fprintf(pipe, "set terminal jpeg medium\n");
+        fprintf(pipe, "set output 'temp/uSim_tp&gp.jpeg'\n");
+        fprintf(pipe, "set xlabel 'Tiempo(s)'\n");
+        fprintf(pipe, "set ylabel 'Rendimiento(bps)'\n");
+        fprintf(pipe, "set key top left\n");
+
+        fprintf(pipe, "plot \"temp/tp_trace.dat\" using 1:2 with linespoints linetype rgb \"#0404B4\" title \" Throughput \", \"temp/gp_trace.dat\" using 1:2 with linespoints linetype rgb \"#FF4000\" title \" Goodput \"\n");
         fclose(pipe);
     }
 
@@ -1075,6 +1111,7 @@ public:
     float getDELAY1(){return DELAY1;}
     float getDELAY2(){return DELAY2;}
     float getTIMEOUT(){return TIMEOUT;}
+    float getDELTA(){return DELTA;}
     QString getlog(){return log;}
 
 };

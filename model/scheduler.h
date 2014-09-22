@@ -29,8 +29,8 @@ class ListScheduler {
                 return false;
             if (e->get_from_node() == NULL || e->get_to_node() == NULL)
                 return false;
-            if (e->get_assoc_pdu() == NULL)
-                return false;
+            //if (e->get_assoc_pdu() == NULL)
+                //return false;
             return true;
         }
 

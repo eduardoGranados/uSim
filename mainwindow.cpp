@@ -7,7 +7,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)  //definir constructor de ventana principal
 {
     ui->setupUi(this);QSize(840,470);
-    sim=new SSsim();
     usim = new USim();
 
     //Directorios
@@ -25,6 +24,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionNew, SIGNAL(triggered()), this, SLOT(botonNewClicked()));
     connect(ui->actionGuardar, SIGNAL(triggered()), this, SLOT(botonGuardarClicked()));
     connect(ui->experiments , SIGNAL(currentIndexChanged(int)),this,SLOT(experimentsChanged()));
+
 
 }
 
@@ -80,21 +80,12 @@ void MainWindow::refreshWindow(QString date){
                             data.attribute("bn1").toInt(),data.attribute("bn2").toInt(),
                             data.attribute("ndivack").toInt(),data.attribute("ssthresh").toInt(),
                             data.attribute("buffer").toInt(),data.attribute("delay1").toFloat(),data.attribute("delay2").toFloat(),
-                            data.attribute("timeout").toFloat());
+                            data.attribute("timeout").toFloat(),data.attribute("delta").toFloat());
             usim->run_sim();
             usim->plot_cwnd();
             usim->plot_gp();
             usim->plot_tp();
 
-
-//            sim = new SSsim(data.attribute("nrtt").toInt(),data.attribute("divack").toFloat(),
-//                            data.attribute("fsize").toFloat(),data.attribute("cwndO").toFloat(),
-//                            data.attribute("delay").toFloat(),data.attribute("ssthresh").toFloat(),
-//                            data.attribute("rwnd").toFloat(), tempPath); //nueva instancia de Simulador
-//            sim->init();
-//            // qDebug() << sim->getlog();
-//            ui->logTextEdit->clear();
-//            ui->logTextEdit->appendPlainText(sim->getlog());
             showPlots();
             break;
         }else{
@@ -158,6 +149,12 @@ void MainWindow::showPlots(){  //muestra graficas en mainwindow
     QPixmap pixmaptp = icon.pixmap(size, QIcon::Normal, QIcon::On);
     ui->tp_area->setPixmap(pixmaptp);
 
+    sprintf(auxPath,"%suSim_tp&gp.jpeg", tempPath);
+    QPixmap background4(auxPath);
+    icon.addPixmap(background4, QIcon::Normal, QIcon::On);
+    size = QSize(840,470);
+    QPixmap pixmaptpandgp = icon.pixmap(size, QIcon::Normal, QIcon::On);
+    ui->tpygp_area->setPixmap(pixmaptpandgp);
     delete []auxPath;
 }
 
@@ -192,21 +189,8 @@ void MainWindow::saveToFile(){ //guarda en fileRoute simulacion reciente
             indata.setAttribute("delay1",usim->getDELAY1());
             indata.setAttribute("delay2",usim->getDELAY2());
             indata.setAttribute("timeout",usim->getTIMEOUT());
+            indata.setAttribute("delta",usim->getDELTA());
             simulation.appendChild(indata);
-
-//            indata.setAttribute("nrtt",sim->getnRTT());
-//            indata.setAttribute("fsize",sim->getfileSize());
-//            indata.setAttribute("cwndO",sim->getinitCwnd());
-//            indata.setAttribute("delay",sim->getdelay());
-//            indata.setAttribute("ssthresh",sim->getinitthresh());
-//            indata.setAttribute("rwnd",sim->getrwnd());
-//            indata.setAttribute("divack",sim->getndivAcks());
-//
-//            //agregar log
-//            QDomElement log = document.createElement("log");
-//            simulation.appendChild(log);
-//            QDomCDATASection logcdata=document.createCDATASection(sim->getlog());
-//            log.appendChild(logcdata);
 
             if(!file.open(QIODevice::WriteOnly | QIODevice::Text))
             {
@@ -259,14 +243,9 @@ void MainWindow::saveToFile(){ //guarda en fileRoute simulacion reciente
                 indata.setAttribute("delay1",usim->getDELAY1());
                 indata.setAttribute("delay2",usim->getDELAY2());
                 indata.setAttribute("timeout",usim->getTIMEOUT());
+                indata.setAttribute("delta",usim->getDELTA());
                 simulation.appendChild(indata);
 
-//
-//                //agregar log
-//                QDomElement log = document.createElement("log");
-//                simulation.appendChild(log);
-//                QDomCDATASection logcdata=document.createCDATASection(sim->getlog());
-//                log.appendChild(logcdata);
 
                 if(!file.open(QIODevice::WriteOnly | QIODevice::Text | QFile::Truncate))
                 {
@@ -289,7 +268,7 @@ void MainWindow::on_exe_clicked() //inicio de simulacion
 
 
     int ps, ar, bw1, bw2, da, sst, acksize, bfs;
-    float d1,d2,to,tsim;
+    float d1,d2,to,tsim,del;
 
 
     tsim = ui->tsim->text().toInt();
@@ -303,14 +282,17 @@ void MainWindow::on_exe_clicked() //inicio de simulacion
     d1 = ui->delay1->text().toFloat();
     d2 = ui->delay2->text().toFloat();
     to = ui->timeout->text().toFloat();
+
+    del = ui->delta->text().toFloat();
 //    acksize = ui->acksize->text().toInt();
 
 
-    usim = new USim(tsim,ar,bw1,bw2,da,sst,bfs,d1,d2,to);
+    usim = new USim(tsim,ar,bw1,bw2,da,sst,bfs,d1,d2,to,del);
     usim->run_sim();
     usim->plot_cwnd();
     usim->plot_gp();
     usim->plot_tp();
+    usim->plot_tp_and_gp();
 
 
 //    //qDebug() << sim->getlog();

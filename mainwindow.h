@@ -23,7 +23,6 @@
 #include <QFileDialog>
 #include <QBrush>
 #include <QDir>
-#include "sssim.h"
 #include "usim.h"
 
 
@@ -39,7 +38,7 @@ private:
     QToolButton *botonNew;
     bool bandNew;
     QString fileRoute;
-    SSsim * sim;
+
     USim * usim;
     QDomDocument sesion;    //sesion actual de experimentos
     QDir execRoute;         //Ruta del ejecutable

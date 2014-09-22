@@ -16,7 +16,6 @@ SOURCES += main.cpp\
         mainwindow.cpp
 
 HEADERS  += mainwindow.h \
-    sssim.h \
     event.h \
     link.h \
     node.h \
